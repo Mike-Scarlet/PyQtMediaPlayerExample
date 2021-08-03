@@ -6,12 +6,15 @@ from PyQt5 import QtCore, QtGui, QtWidgets, QtMultimedia, QtMultimediaWidgets
 import typing, os
 
 class Player(QtWidgets.QWidget):
-  def __init__(self, parent: QtWidgets.QWidget) -> None:
+  def __init__(self, parent: QtWidgets.QWidget = None) -> None:
     super().__init__(parent=parent)
 
     self.video_widget = None
     self.cover_label = None
     self.slider = None
+    self.track_info = ""
+    self.status_info = ""
+    self.duration = 0
 
     self.setupUi()
 
@@ -43,7 +46,7 @@ class Player(QtWidgets.QWidget):
     self.play_list_view.activated.connect(self.jump)
 
     self.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-    self.slider.setRange(0, self.player.duration)
+    self.slider.setRange(0, self.player.duration())
 
     self.label_duration = QtWidgets.QLabel(self)
     self.slider.sliderMoved.connect(self.seek)
@@ -79,9 +82,9 @@ class Player(QtWidgets.QWidget):
     self.display_layout.addWidget(self.play_list_view)
 
     self.control_layout = QtWidgets.QHBoxLayout()
-    self.control_layout.setMargin(0)
+    self.control_layout.setContentsMargins(0,0,0,0)
     self.control_layout.addWidget(self.open_button)
-    self.control_layout.setStretch(1)
+    self.control_layout.addStretch(1)
     self.control_layout.addWidget(self.controls)
     self.control_layout.addStretch(1)
     self.control_layout.addWidget(self.full_screen_button)
@@ -97,7 +100,7 @@ class Player(QtWidgets.QWidget):
 
     self.setLayout(self.main_layout)
 
-    if self.player.isAvailable():
+    if not self.player.isAvailable():
       QtWidgets.QMessageBox.warning(
         self, "Service not available",
         "The QMediaPlayer object does not have a valid service. \n \
@@ -110,16 +113,23 @@ class Player(QtWidgets.QWidget):
 
     self.metaDataChanged()
   
+    self.ConnectDebugSignals()
+
+  def ConnectDebugSignals(self):
+    self.play_list.loaded.connect(lambda: print("loaded"))
+    self.play_list.loadFailed.connect(lambda: print("load failed"))
+  
   def open(self):
     file_dialog = QtWidgets.QFileDialog(self)
     file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptOpen)
     file_dialog.setWindowTitle("Open Files")
-    supported_mime_types = self.player.supportedMimeTypes()
-    if len(supported_mime_types) == 0:
-      supported_mime_types.append("audio/x-m3u")
-      file_dialog.setMimeTypeFilters(supported_mime_types)
-    file_dialog.setDirectory(QtCore.QStandardPaths.standardLocations(
-      QtCore.QStandardPaths.MoviesLocation).value(0, QtCore.QDir.homePath()))
+    # supported_mime_types = self.player.supportedMimeTypes()
+    # if len(supported_mime_types) == 0:
+    #   supported_mime_types.append("audio/x-m3u")
+    #   file_dialog.setMimeTypeFilters(supported_mime_types)
+    # file_dialog.setDirectory(QtCore.QStandardPaths.standardLocations(
+    #   QtCore.QStandardPaths.MoviesLocation)[0])
+    file_dialog.setDirectory(r"E:\A10\All")
 
     if file_dialog.exec() == QtWidgets.QDialog.Accepted:
       self.addToPlaylist(file_dialog.selectedUrls())
@@ -128,23 +138,25 @@ class Player(QtWidgets.QWidget):
     if not url.isLocalFile():
       return False
     file_info = url.toLocalFile()
-    return os.path.exists(file_info) and not file_info.split(".")[-1].lower() == "m3u"
+    return os.path.exists(file_info) and file_info.split(".")[-1].lower() == "m3u"
   
   def addToPlaylist(self, urls: typing.List[QtCore.QUrl]):
     for url in urls:
       if self.isPlaylist(url):
         self.play_list.load(url)
       else:
-        self.play_list.addMedia(url)
+        self.play_list.addMedia(QtMultimedia.QMediaContent(url))
   
   def durationChanged(self, duration: int):
-    self.duration = duration / 1000
-    self.slider.setMaximum(self.duration / 1000)
+    print("duration changed {}".format(duration))
+    self.duration = duration // 1000
+    self.slider.setMaximum(duration // 1000)
 
-  def PositionChanged(self, progress: int):
+  def positionChanged(self, progress: int):
+    print("position changed {}".format(progress))
     if not self.slider.isSliderDown():
-      self.slider.setValue(progress / 1000)
-    self.updateDurationInfo(progress / 1000)
+      self.slider.setValue(progress // 1000)
+    self.updateDurationInfo(progress // 1000)
 
   def metaDataChanged(self):
     if self.player.isMetaDataAvailable():
@@ -215,4 +227,43 @@ class Player(QtWidgets.QWidget):
       if self.full_screen_button.isChecked():
         self.video_widget.setFullScreen(True)
     
-  
+  def setTrackInfo(self, info: str):
+    self.track_info = info
+    if len(self.status_info) != 0:
+      self.setWindowTitle("{} - {}".format(self.track_info, self.status_info))
+    else:
+      self.setWindowTitle(self.track_info)
+
+  def setStatusInfo(self, info: str):
+    self.status_info = info
+    if len(self.status_info) != 0:
+      self.setWindowTitle("{} - {}".format(self.track_info, self.status_info))
+    else:
+      self.setWindowTitle(self.track_info)
+
+  def displayErrorMessage(self):
+    self.setStatusInfo(self.player.errorString())
+
+  def updateDurationInfo(self, current_info: int):
+    t_str = ""
+    if current_info or self.duration:
+      current_time = QtCore.QTime(
+        (current_info // 3600) % 60, (current_info // 60) % 60, current_info % 60, (current_info * 1000) % 1000
+      )
+      total_time = QtCore.QTime(
+        (self.duration // 3600) % 60, (self.duration // 60) % 60, self.duration % 60, (self.duration * 1000) % 1000
+      )
+      format = "mm:ss"
+      if self.duration > 3600:
+        format = "hh:mm:ss"
+      t_str = current_time.toString(format) + " / " + total_time.toString(format)
+    self.label_duration.setText(t_str)
+
+if __name__ == "__main__":
+  import sys
+  app = QtWidgets.QApplication(sys.argv)
+
+  player = Player()
+  player.show()
+
+  exit(app.exec_())

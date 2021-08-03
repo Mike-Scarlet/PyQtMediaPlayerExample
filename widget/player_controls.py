@@ -67,7 +67,7 @@ class PlayerControls(QtWidgets.QWidget):
     self.rate_box.activated.connect(self.updateRate)
 
     self.box_layout = QtWidgets.QHBoxLayout()
-    self.box_layout.setMargin(0)
+    self.box_layout.setContentsMargins(0,0,0,0)
     self.box_layout.addWidget(self.stop_button)
     self.box_layout.addWidget(self.previous_button)
     self.box_layout.addWidget(self.play_button)

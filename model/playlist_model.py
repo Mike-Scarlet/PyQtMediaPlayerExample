@@ -14,18 +14,18 @@ class PlaylistModel(QtCore.QAbstractItemModel):
     self.data_dict = {}
 
   def rowCount(self, parent: QtCore.QModelIndex) -> int:
-    if self.media_playlist is not None and parent.isValid():
+    if self.media_playlist is not None and not parent.isValid():
       return self.media_playlist.mediaCount()
     else:
       return 0
 
   def columnCount(self, parent: QtCore.QModelIndex) -> int:
-    if parent.isValid():
+    if not parent.isValid():
       return PlaylistColumnEnum.Count.value
     else:
       return 0
 
-  def index(self, row: int, column: int, parent: QtCore.QModelIndex) -> QtCore.QModelIndex:
+  def index(self, row: int, column: int, parent: QtCore.QModelIndex=QtCore.QModelIndex()) -> QtCore.QModelIndex:
     if self.media_playlist is not None and \
        not parent.isValid() and \
        row >= 0 and row < self.media_playlist.mediaCount() and \
@@ -39,9 +39,8 @@ class PlaylistModel(QtCore.QAbstractItemModel):
 
   def data(self, index: QtCore.QModelIndex, role: int) -> typing.Any:
     if index.isValid() and role == QtCore.Qt.DisplayRole:
-      value = QtCore.QVariant()
-      value = self.data_dict[index]
-      if not value.isValid() and index.column() == PlaylistColumnEnum.Title.value:
+      value = self.data_dict.get(index, None)
+      if value is None and index.column() == PlaylistColumnEnum.Title.value:
         location = self.media_playlist.media(index.row()).canonicalUrl()
         return QtCore.QFileInfo(location.path()).fileName()
       return value
@@ -70,14 +69,14 @@ class PlaylistModel(QtCore.QAbstractItemModel):
 
     self.endResetModel()
 
-  def setData(self, index: QtCore.QModelIndex, value: typing.Any, role: int) -> bool:
+  def setData(self, index: QtCore.QModelIndex, value: typing.Any, role: int=QtCore.Qt.EditRole) -> bool:
     self.data_dict[index] = value
     self.dataChanged.emit(index, index)
     return True
 
   def beginInsertItems(self, start: int, end: int):
     self.data_dict.clear()
-    self.beginInsertRows(start, end)
+    self.beginInsertRows(QtCore.QModelIndex(), start, end)
 
   def endInsertItems(self):
     self.endInsertRows()
@@ -93,4 +92,3 @@ class PlaylistModel(QtCore.QAbstractItemModel):
     self.data_dict.clear()
     self.dataChanged.emit(self.index(start, 0), 
                           self.index(end, PlaylistColumnEnum.Count.value))  
-pass

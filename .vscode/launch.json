@@ -11,6 +11,14 @@
       "program": "${file}",
       "env": {"PYTHONPATH": "${workspaceFolder}"},
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Player",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/widget/player.py",
+      "env": {"PYTHONPATH": "${workspaceFolder}"},
+      "console": "integratedTerminal"
     }
   ]
 }
